@@ -1,63 +1,58 @@
 import streamlit as st
 import yfinance as yf
 import pandas as pd
+from datetime import datetime
 
-@st.cache_data
+# CRITICAL CHANGE: ttl=86400 forces a data refresh after 24 hours (86400 seconds).
+# The first user to access the app after 24 hours have passed will trigger the update.
+@st.cache_data(ttl=86400) 
 def load_data():
     """
-    Downloads 10 years of 'KO' and 'PEP' stock data, cleans it, and caches the result.
-    The function returns a DataFrame of cleaned, 10-year daily Close prices.
+    Downloads 'KO' and 'PEP' stock data from Jan 1, 2015, to today's date.
+    The data is cached for 24 hours (86400 seconds) to ensure a daily update.
     """
-    # 1. DOWNLOAD (10 years for KO and PEP)
+    # 1. DOWNLOAD (Specific date range for KO and PEP)
     tickers = ['KO', 'PEP']
     
-    # Download 10 years of daily data
+    # Define the start date (1st January 2015)
+    start_date = '2015-01-01'
+    
+    # Define the end date as today
+    end_date = datetime.today().strftime('%Y-%m-%d')
+    
+    # Note: For financial data, yfinance may return up to the last *market* close, not the current minute.
     data = yf.download(
         tickers=tickers,
-        period='10y',
+        start=start_date,
+        end=end_date,
         interval='1d',
-        group_by='ticker',  # Important: Groups columns by ticker (KO, PEP)
-        auto_adjust=True,   # Adjusts prices for splits and dividends
+        group_by='ticker',
+        auto_adjust=True,
         progress=False
     )
     
     # 2. CLEANING AND TRANSFORMING
     
-    # yfinance returns a MultiIndex DataFrame (e.g., ('KO', 'Close'), ('KO', 'Volume'), etc.)
-    
-    # a. Select only the 'Close' prices for both stocks
+    # Select only the 'Close' prices for both stocks
     try:
-        # Create a new DataFrame with just the Close prices
         close_data = pd.DataFrame({
             'KO_Close': data['KO']['Close'],
             'PEP_Close': data['PEP']['Close']
         })
     except KeyError:
-        # Handle cases where yfinance might return a flat structure for a single day, 
-        # though rare with period='10y'. We'll stick to the desired columns.
-        print("Warning: Data structure unexpected, proceeding with available columns.")
-        # If the structure is flat, we'll try to select columns directly, 
-        # but the MultiIndex is standard for multiple tickers.
+        # In case the expected MultiIndex structure isn't returned
+        print("Warning: Data structure unexpected.")
         return None 
     
-    # b. Drop rows with any missing values (NaNs)
-    # This is a crucial cleaning step to ensure consistent time series analysis
+    # Drop rows with any missing values (NaNs)
     cleaned_data = close_data.dropna(how='any')
-    
-    # 3. CACHE (Handled by the @st.cache_data decorator)
     
     return cleaned_data
 
 if __name__ == '__main__':
-    # This block is for local testing (won't be used by Streamlit)
+    # Local testing block
     print("--- Testing load_data() locally ---")
-    try:
-        df = load_data()
-        if df is not None:
-            print(f"Data loaded successfully. Shape: {df.shape}")
-            print("\nFirst 5 rows:")
-            print(df.head())
-            print("\nMissing values check (should be 0):")
-            print(df.isnull().sum())
-    except Exception as e:
-        print(f"An error occurred during local test: {e}")
+    df = load_data()
+    if df is not None:
+        print(f"Data loaded successfully. Range: {df.index.min().strftime('%Y-%m-%d')} to {df.index.max().strftime('%Y-%m-%d')}")
+        print(df)
