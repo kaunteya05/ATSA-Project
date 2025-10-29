@@ -1,0 +1,29 @@
+# Python virtual environment
+venv/
+*.venv/
+env/
+
+# Python cache
+__pycache__/
+*.py[cod]
+
+# Jupyter Notebook cache
+.ipynb_checkpoints
+
+# Large data files (if you download any to CSV)
+*.csv
+*.xlsx
+
+# Saved models
+# We WANT to track the models in this project,
+# but if they were huge (multi-GB), you would add them here.
+# For now, we will leave them out so they get uploaded.
+# *.h5
+# *.pkl
+
+# Streamlit config
+.streamlit/
+
+# OS-specific files
+.DS_Store
+Thumbs.db

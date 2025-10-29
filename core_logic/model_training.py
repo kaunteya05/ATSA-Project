@@ -27,7 +27,7 @@ from tensorflow.keras.preprocessing.sequence import TimeseriesGenerator
 # 3. CRITICALLY: Returns the 10-year spread as a pandas.Series.
 try:
     # This line is edited to match your project's file name
-    from Cointegration_Test import get_spread_parameters
+    from analysis import get_spread_parameters
 except ImportError as e:
     print(f"FATAL ERROR: Make sure 'cointegration_test.py' exists.")
     print(f"Error details: {e}")
