@@ -1,103 +1,98 @@
 # pages/2_🚀_Live_Signal.py
 
 import streamlit as st
-import sys
-import os
+import sys, os
 
-# --- Page Configuration ---
-st.set_page_config(
-    page_title="Live Trading Signals",
-    page_icon="🚀"
-)
+# Ensure we can import from core_logic when Streamlit runs from project root
+PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+if PROJECT_ROOT not in sys.path:
+    sys.path.append(PROJECT_ROOT)
 
-# --- Path Hack for Imports ---
-# This tells Python to look in the main project folder
-# to find the 'core_logic' module.
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
-
-# --- Import Your Team's Functions ---
-# We import the functions from Person 4 (Inference Lead)
+# Import live signal functions
 try:
     from core_logic.model_inference import (
         get_zscore_signal,
         get_arima_signal,
         get_lstm_signal,
-        get_ml_signal
+        get_ml_signal,
     )
-    IMPORTS_SUCCESSFUL = True
-except ImportError as e:
-    st.error(f"Error: {e}. Could not import from 'core_logic.model_inference'. Check file/function names.")
-    IMPORTS_SUCCESSFUL = False
+    IMPORTS_OK = True
+except Exception as e:
+    IMPORTS_OK = False
+    IMPORT_ERR = str(e)
 
-# --- Main Page UI ---
-st.title("🚀 Live Trading Signals")
-st.write("Choose a model to get the latest live signal.")
+# ---------------- UI ----------------
+st.set_page_config(page_title="Live Trading Signals", page_icon="🚀", layout="wide")
+st.title("🚀 Live Trading Signals — KO vs PEP (Spread)")
 
-# --- DELIVERABLE 1: The Radio Button ---
+st.write(
+    "Signals are generated on the **log-spread**:  \n"
+    r"$\text{spread} = \log(\mathrm{KO}) - \beta \cdot \log(\mathrm{PEP})$"
+)
+
 model_choice = st.radio(
     "Select a Trading Model:",
     ("Z-Score (Pairs)", "ARIMA (Time Series)", "LSTM (Deep Learning)", "ML (Classification)"),
     horizontal=True,
-    key="model_choice"
+    key="model_choice_live",
 )
 
-# --- DELIVERABLE 2 & 3: Call Function & Show Metric (UPDATED) ---
-# This code will only run if the imports from Person 4 worked.
-if IMPORTS_SUCCESSFUL:
-    
-    # NEW: Create placeholders for both return values
-    signal = "HOLD" 
-    details = "Waiting for model..."
+if not IMPORTS_OK:
+    st.error(f"Could not import live model functions: {IMPORT_ERR}")
+    st.stop()
 
-    # We add a spinner so the user knows work is being done.
-    # The 'get_live_spread_data()' function takes a moment.
-    with st.spinner(f"Running {model_choice} model..."):
-        try:
-            # NEW: We now unpack a (signal, details) tuple from each function
-            if model_choice == "Z-Score (Pairs)":
-                signal, details = get_zscore_signal()
-                
-            elif model_choice == "ARIMA (Time Series)":
-                signal, details = get_arima_signal()
-                
-            elif model_choice == "LSTM (Deep Learning)":
-                signal, details = get_lstm_signal()
-                
-            elif model_choice == "ML (Classification)":
-                signal, details = get_ml_signal()
-        
-        except Exception as e:
-            # Catch any unexpected runtime errors
-            signal = "ERROR"
-            details = f"A runtime error occurred in the model: {str(e)}"
+# Map of callable per model
+MODEL_FN = {
+    "Z-Score (Pairs)": get_zscore_signal,
+    "ARIMA (Time Series)": get_arima_signal,
+    "LSTM (Deep Learning)": get_lstm_signal,
+    "ML (Classification)": get_ml_signal,
+}
 
-    # --- Display the Result (UPDATED) ---
-    # We use columns to make it look clean and centered.
-    col1, col2, col3 = st.columns([1, 2, 1])
-    
-    with col2:
-        st.subheader(f"Signal for: {model_choice}")
-        
-        # NEW: Handle the "ERROR" signal gracefully
-        # Person 4's ARIMA logic might return "ERROR" if the file is missing
-        if signal == "ERROR":
-            st.error(f"Model Error: {details}")
-        
-        # --- This is the main display logic ---
-        elif signal == "BUY":
-            st.metric(label="Current Signal", value="BUY", delta="Positive Forecast", delta_color="normal")
-            # NEW: We add the details string below the metric
-            st.caption(f"Reason: {details}")
-        
-        elif signal == "SELL":
-            st.metric(label="Current Signal", value="SELL", delta="Negative Forecast", delta_color="inverse")
-            # NEW: We add the details string below the metric
-            st.caption(f"Reason: {details}")
-            
-        else: # HOLD
-            st.metric(label="Current Signal", value="HOLD", delta="Neutral", delta_color="off")
-            # NEW: We add the details string below the metric
-            st.caption(f"Reason: {details}")
+# Helper: convert spread signal -> explicit pair actions
+def explain_actions(signal: str):
+    """
+    For spread = log(KO) - beta*log(PEP):
+    BUY  -> expect spread ↑  -> Long KO / Short PEP
+    SELL -> expect spread ↓  -> Short KO / Long PEP
+    HOLD -> no position
+    """
+    if signal == "BUY":
+        return "BUY (Long KO / Short PEP)"
+    if signal == "SELL":
+        return "SELL (Short KO / Long PEP)"
+    return "HOLD (Square off / No position)"
 
+# ---------------- Run & Display ----------------
+st.subheader(f"Signal for: {model_choice}")
+
+with st.spinner(f"Running {model_choice}..."):
+    try:
+        signal, details = MODEL_FN[model_choice]()  # each returns (signal, details)
+    except Exception as e:
+        signal, details = "ERROR", f"A runtime error occurred in the model: {e}"
+
+# Normalize details into string
+details = "" if details is None else str(details)
+
+if signal == "ERROR":
+    st.error(f"Model Error: {details}")
 else:
-    st.warning("Model logic could not be imported. Page is disabled.")
+    pretty_value = explain_actions(signal)
+
+    if signal == "BUY":
+        st.metric(label="Current Signal", value=pretty_value, delta="Positive Forecast", delta_color="normal")
+        st.caption(f"Reason: {details}")
+    elif signal == "SELL":
+        st.metric(label="Current Signal", value=pretty_value, delta="Negative Forecast", delta_color="inverse")
+        st.caption(f"Reason: {details}")
+    else:
+        st.metric(label="Current Signal", value=pretty_value, delta="Neutral", delta_color="off")
+        st.caption(f"Reason: {details}")
+
+# Helpful note for viva/exam
+st.info(
+    "Interpretation: A **BUY** signal means the spread is expected to **increase** "
+    "(go **long KO**, **short PEP**). A **SELL** signal means the spread is expected to **decrease** "
+    "(go **short KO**, **long PEP**). **HOLD** means no trade / square off."
+)
