@@ -4,6 +4,31 @@ st.set_page_config(page_title="ATSA Project", layout="wide")
 
 st.title("Applied Time Series Analysis Project")
 
+import yfinance as yf
+import pandas as pd
+from datetime import datetime
+import streamlit as st
+
+st.title("ATSA Pairs Trading Project - KO vs PEP")
+
+# Load 10 year KO / PEP close
+start_date = "2015-01-01"
+end_date = datetime.today().strftime('%Y-%m-%d')
+df = yf.download(["KO","PEP"],
+                 start=start_date,
+                 end=end_date,
+                 interval="1d",
+                 auto_adjust=True,
+                 progress=False)
+
+price_df = pd.DataFrame({
+    "KO": df["Close"]["KO"],
+    "PEP": df["Close"]["PEP"]
+}).dropna()
+
+st.subheader("10-Year Price Comparison")
+st.line_chart(price_df)
+
 st.markdown("""
 ### Project Topic: Cointegrated Pairs + Forecast Driven Trading
 

@@ -41,27 +41,28 @@ def get_live_spread_data():
     params = _load_params()
     beta = params["beta"]
 
-    ko = yf.download("KO",period="100d",interval="1d")
-    pep = yf.download("PEP",period="100d",interval="1d")
+    ko = yf.download("KO",period="100d",interval="1d",auto_adjust=True,progress=False)
+    pep = yf.download("PEP",period="100d",interval="1d",auto_adjust=True,progress=False)
 
     df = pd.concat([ko["Close"],pep["Close"]],axis=1)
     df.columns=["KO","PEP"]
     df.dropna(inplace=True)
 
+    # LOG SPREAD
     df["Spread"] = np.log(df["KO"]) - beta*np.log(df["PEP"])
     return df["Spread"]
 
 
 # ---- Z-SCORE ----
 def get_zscore_signal():
-    p = _load_params()
-    mean = p.get("mean", p.get("mu"))
-    std = p.get("std_dev", p.get("sigma"))
+    params = _load_params()
+    mu = params["mu"]
+    sigma = params["sigma"]
 
     live = get_live_spread_data()
     curr = live.iloc[-1]
 
-    z = (curr - mean) / std
+    z = (curr - mu) / sigma
 
     if z < -2:
         return "BUY", f"ZScore: {z:.4f}"
